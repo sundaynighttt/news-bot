@@ -1,0 +1,33 @@
+name: Daily Naver News Scraper
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # UTC 기준, 한국 9시 = 0시 (UTC)
+  workflow_dispatch:  # 수동 실행 버튼 추가
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run scraper
+        run: python news_scraper.py
+
+      - name: Commit results
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+          git commit -m "Daily update: news summary"
+          git push
