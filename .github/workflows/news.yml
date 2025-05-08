@@ -2,10 +2,10 @@ name: Daily Naver News Scraper
 
 on:
   schedule:
-    - cron: '0 22 * * *'  # 한국시간 7시 = UTC 22시
-    workflow_dispatch:
+    - cron: '0 22 * * *'  # 매일 오전 7시 KST
+  workflow_dispatch:
 
-permissions:  # ✅ 추가
+permissions:
   contents: write
 
 jobs:
@@ -27,7 +27,7 @@ jobs:
       - name: Run scraper
         run: python news_scraper.py
 
-      - name: Commit and Push
+      - name: Commit results
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
@@ -35,5 +35,4 @@ jobs:
           git commit -m "Daily update: news summary" || echo "Nothing to commit"
           git push
         env:
-          # ✅ GITHUB_TOKEN을 환경변수로 주입해야 푸시 가능
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
