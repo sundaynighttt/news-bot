@@ -30,7 +30,12 @@ articles = soup.select('.rankingnews_box a')
 results = {k: [] for k in keywords}
 for article in articles:
     title = article.text.strip()
-    link = "https://news.naver.com" + article['href']
+    href = article['href']
+    if not href.startswith("http"):
+        link = "https://news.naver.com" + href
+    else:
+        link = href
+
     for category, words in keywords.items():
         if any(word in title for word in words):
             if len(results[category]) < 10:
