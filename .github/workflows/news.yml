@@ -2,8 +2,8 @@ name: Daily Naver News Scraper
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # 한국시간 9시 = UTC 0시
-  workflow_dispatch:
+    - cron: '0 22 * * *'  # 한국시간 7시 = UTC 22시
+    workflow_dispatch:
 
 permissions:  # ✅ 추가
   contents: write
