@@ -19,6 +19,12 @@ SPREADSHEET_ID = '1KBDB7D5sTvCGM-thDkYCnO-2kvsSoQc4RxDGoOO4Rdk'
 SOURCE_SHEET = '뉴스요약'
 TARGET_SHEET = '요약결과'
 
+CATEGORY_EMOJI = {
+    '부동산': '🏠',
+    '금리': '💰',
+    '해외주식': '📈'
+}
+
 def fetch_today_news():
     scopes = ['https://www.googleapis.com/auth/spreadsheets']
     credentials = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=scopes)
@@ -48,18 +54,21 @@ def run_claude_summary(title, content):
     response = requests.post("https://api.anthropic.com/v1/messages", headers=headers, json=data)
     return response.json()["content"][0]["text"].strip()
 
+def shorten_title(title):
+    return title if len(title) <= 10 else title[:10] + "..."
+
 def compose_markdown(grouped):
     today_str_kor = datetime.now().strftime('%Y년 %m월 %d일')
-    lines = [f"{today_str_kor} 경제정보 요약\n"]
+    lines = [f"✅ {today_str_kor} 경제정보 요약\n"]
     for idx, (cat, items) in enumerate(grouped.items(), 1):
-        # 카테고리 요약 요청
         combined_content = "\n".join([f"{title}: {summary}" for title, summary, _ in items])
         category_summary = run_claude_summary(f"{cat} 관련 기사 요약", combined_content)
-
-        lines.append(f"{idx}. {cat}")
-        lines.append(f"📌 요약: {category_summary}")
+        emoji = CATEGORY_EMOJI.get(cat, '')
+        lines.append(f"{emoji} {cat}")
+        lines.append(f"🧠 요약: {category_summary}")
         for title, summary, link in items:
-            lines.append(f"- {title}, {summary}\n  (원문링크: {link})")
+            short_title = shorten_title(title)
+            lines.append(f"- {emoji} {short_title}\n  {summary}\n  🔗 {link}")
         lines.append("")
     return "\n".join(lines)
 
