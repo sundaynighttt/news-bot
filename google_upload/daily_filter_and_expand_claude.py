@@ -1,4 +1,3 @@
-
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
@@ -19,26 +18,17 @@ SPREADSHEET_ID = '1KBDB7D5sTvCGM-thDkYCnO-2kvsSoQc4RxDGoOO4Rdk'
 SOURCE_SHEET = '뉴스요약'
 TARGET_SHEET = '요약결과'
 
-CATEGORY_EMOJI = {
-    '부동산': '🏠',
-    '금리': '💰',
-    '해외주식': '📈'
+EMOJIS = {
+    '부동산': '📌 부동산',
+    '금리': '💰 금리',
+    '해외주식': '📈 해외주식'
 }
 
-def fetch_today_news():
-    scopes = ['https://www.googleapis.com/auth/spreadsheets']
-    credentials = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=scopes)
-    gc = gspread.authorize(credentials)
-    sh = gc.open_by_key(SPREADSHEET_ID)
-    ws = sh.worksheet(SOURCE_SHEET)
-    rows = ws.get_all_values()[1:]  # header 제외
+HEAD = '✅ {date} 경제정보 요약\n'
 
-    today = datetime.now().strftime('%Y-%m-%d')
-    filtered = [r for r in rows if r[0] == today and "본문 추출 실패" not in r[3]]
-    return filtered, sh
-
+# Claude 요약 요청
 def run_claude_summary(title, content):
-    prompt = f"Human: 다음 뉴스 제목과 내용을 한 문장으로 요약해줘.\n제목: {title}\n내용: {content}\n\nAssistant:"
+    prompt = f"""Human: 다음 뉴스 제목과 내용을 한 문장으로 요약해줘.\n제목: {title}\n내용: {content}\n\nAssistant:"""
     headers = {
         "x-api-key": os.environ['ANTHROPIC_API_KEY'],
         "anthropic-version": "2023-06-01",
@@ -50,40 +40,44 @@ def run_claude_summary(title, content):
         "temperature": 0.5,
         "messages": [{"role": "user", "content": prompt}]
     }
-
     response = requests.post("https://api.anthropic.com/v1/messages", headers=headers, json=data)
     return response.json()["content"][0]["text"].strip()
 
-def shorten_title(title):
-    return title if len(title) <= 10 else title[:10] + "..."
+# 뉴스 필터링
+def fetch_today_news():
+    scopes = ['https://www.googleapis.com/auth/spreadsheets']
+    credentials = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=scopes)
+    gc = gspread.authorize(credentials)
+    sh = gc.open_by_key(SPREADSHEET_ID)
+    ws = sh.worksheet(SOURCE_SHEET)
+    rows = ws.get_all_values()[1:]  # header 제외
+    today = datetime.now().strftime('%Y-%m-%d')
+    filtered = [r for r in rows if r[0] == today and "본문 추출 실패" not in r[3]]
+    return filtered, sh
 
+# 마크다운 요약문 생성
 def compose_markdown(grouped):
     today_str_kor = datetime.now().strftime('%Y년 %m월 %d일')
-    lines = [f"✅ {today_str_kor} 경제정보 요약\n"]
-    for idx, (cat, items) in enumerate(grouped.items(), 1):
-        combined_content = "\n".join([f"{title}: {summary}" for title, summary, _ in items])
-        category_summary = run_claude_summary(f"{cat} 관련 기사 요약", combined_content)
-        emoji = CATEGORY_EMOJI.get(cat, '')
-        lines.append(f"{emoji} {cat}")
-        lines.append(f"🧠 요약: {category_summary}")
-        for title, summary, link in items:
-            short_title = shorten_title(title)
-            lines.append(f"- {emoji} {short_title}\n  {summary}\n  🔗 {link}")
-        lines.append("")
+    lines = [HEAD.format(date=today_str_kor)]
+    for cat, items in grouped.items():
+        lines.append(f"{EMOJIS.get(cat, cat)}")
+        summary = run_claude_summary(" / ".join([i[0] for i in items]), "\n".join([i[1] for i in items]))
+        lines.append(f"\U0001f9e0 요약: {summary}\n")
+        for title, content, link in items[:5]:  # 최대 5개 제한
+            lines.append(f"\u2022 \ud83d\udd39 {title[:20]}\n    \ud83d\udcc4 AI 요약: {run_claude_summary(title, content)}\n    \ud83d\udd17 링크: {link})\n")
     return "\n".join(lines)
 
+# 메인
 def main():
     today = datetime.now().strftime('%Y-%m-%d')
     rows, sh = fetch_today_news()
-
     grouped = defaultdict(list)
     for row in rows:
         category, title, content, link = row[1], row[2], row[3], row[4]
-        if len(grouped[category]) < 5:
-            gpt_summary = run_claude_summary(title, content)
-            grouped[category].append((title, gpt_summary, link))
+        grouped[category].append((title, content, link))
 
     markdown_summary = compose_markdown(grouped)
+
     try:
         target_ws = sh.worksheet(TARGET_SHEET)
     except:
