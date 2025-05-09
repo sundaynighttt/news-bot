@@ -32,7 +32,7 @@ def fetch_today_news():
     return filtered, sh
 
 def run_claude_summary(title, content):
-    prompt = f"""Human: 다음 뉴스 제목과 내용을 한 문장으로 짧게 25자이내로 요약해줘.
+    prompt = f"""Human: 다음 뉴스 제목은 10자 이내로, 내용은 한 문장으로 25자이내로 요약해줘.
 제목: {title}
 내용: {content}
 
