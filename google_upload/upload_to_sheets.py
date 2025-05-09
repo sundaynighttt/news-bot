@@ -44,8 +44,7 @@ def convert_md_to_csv(md_file, csv_file):
                 try:
                     title_line = line.strip().split("**")[1]
                     summary = lines[i + 1].replace("- ", "").strip()
-                    link = lines[i + 2].split("(")[-1].rstrip(")
-")
+                    link = lines[i + 2].split("(")[-1].rstrip(")")
                     writer.writerow([date, current_cat, title_line, summary, link])
                 except:
                     continue
