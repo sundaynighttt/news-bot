@@ -32,7 +32,14 @@ def fetch_today_news():
     return filtered, sh
 
 def run_claude_summary(title, content):
-    prompt = f"""Human: 다음 뉴스 제목은 10자 이내로, 내용은 한 문장으로 25자이내로 요약해줘.
+    prompt = f"""Human: 아래 뉴스 제목과 본문 내용을 정확히 다음 형식에 맞춰 요약해줘.
+형식 예시:
+
+제목요약: 금리 동결
+내용요약: 연준 금리 동결 발표 영향
+
+이제 요약할 뉴스는 다음과 같아:
+
 제목: {title}
 내용: {content}
 
@@ -53,28 +60,45 @@ Assistant:"""
     response = requests.post("https://api.anthropic.com/v1/messages", headers=headers, json=data)
     return response.json()["content"][0]["text"].strip()
 
-def emoji_for_category(cat):
-    return {
-        "부동산": "📌",
-        "금리": "💰",
-        "해외주식": "📈"
-    }.get(cat, "📎")
+def run_category_summary(titles_and_contents):
+    article_list = "\n\n".join([f"제목: {t}\n내용: {c}" for t, c in titles_and_contents])
+    prompt = f"""Human: 아래는 같은 분야 뉴스 5개의 제목과 본문 내용이야. 이 5개의 뉴스를 종합해서 하나의 인사이트를 뽑아줘.
+형식:
+🧠 요약: (하나의 문장으로 종합 요약)
+
+{article_list}
+
+Assistant:"""
+
+    headers = {
+        "x-api-key": os.environ['ANTHROPIC_API_KEY'],
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+    }
+    data = {
+        "model": "claude-3-haiku-20240307",
+        "max_tokens": 300,
+        "temperature": 0.4,
+        "messages": [{"role": "user", "content": prompt}]
+    }
+
+    response = requests.post("https://api.anthropic.com/v1/messages", headers=headers, json=data)
+    return response.json()["content"][0]["text"].strip()
 
 def compose_markdown(grouped):
     today_str_kor = datetime.now().strftime('%Y년 %m월 %d일')
     lines = [f"✅ {today_str_kor} 경제정보 요약\n"]
-    for cat, items in grouped.items():
-        emoji = emoji_for_category(cat)
-        lines.append(f"\n{emoji} {cat}")
-        # 전체 요약 추가
-        summaries = [s for _, s, _ in items]
-        top_summary = run_claude_summary(cat, "\n".join(summaries[:5]))
-        lines.append(f"🧠 요약: {top_summary}\n")
-        for title, summary, link in items[:5]:
-            short_title = title.strip().split()[0][:12] + ("…" if len(title.strip()) > 12 else "")
-            lines.append(f"• 🔹 {short_title}")
-            lines.append(f"    📄 AI 요약: {summary}")
-            lines.append(f"    🔗 링크: {link}\n")
+
+    for idx, (cat, items) in enumerate(grouped.items(), 1):
+        # 카테고리 요약
+        category_summary = run_category_summary([(t, c) for t, c, _ in items])
+        lines.append(f"\n📌 {cat}\n{category_summary}\n")
+
+        # 기사별 요약
+        for title, content, link in items:
+            summary = run_claude_summary(title, content)
+            lines.append(f"• 🔹 {title}\n📄 AI 요약: {summary}\n🔗 링크: {link}\n")
+
     return "\n".join(lines)
 
 def main():
@@ -84,8 +108,11 @@ def main():
     grouped = defaultdict(list)
     for row in rows:
         category, title, content, link = row[1], row[2], row[3], row[4]
-        gpt_summary = run_claude_summary(title, content)
-        grouped[category].append((title, gpt_summary, link))
+        grouped[category].append((title, content, link))
+
+    # 5개 제한
+    for cat in grouped:
+        grouped[cat] = grouped[cat][:5]
 
     markdown_summary = compose_markdown(grouped)
     try:
