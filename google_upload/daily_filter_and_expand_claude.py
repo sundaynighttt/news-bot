@@ -32,13 +32,20 @@ def fetch_today_news():
 
 def get_one_line_summary(title, content):
     """뉴스를 한 줄로 간단히 요약"""
-    prompt = f"""다음 뉴스를 카카오톡용으로 20자 이내로 요약하세요.
+    prompt = f"""다음 뉴스를 20자 이내로 핵심만 요약하세요.
 
 제목: {title}
-내용: {content[:500]}
+내용: {content[:300]}
 
-형식: [핵심키워드] + [핵심내용]
-예시: 강남아파트 매도 75% 급증
+규칙:
+- 20자 이내
+- 대괄호 [] 사용 금지
+- 핵심 키워드와 내용만 포함
+- 완전한 문장으로 끝맺음
+
+예시:
+강남아파트 매도 75% 급증
+금리인상으로 대출금리 상승
 
 요약:"""
 
@@ -59,7 +66,13 @@ def get_one_line_summary(title, content):
         response = requests.post("https://api.anthropic.com/v1/messages", 
                                headers=headers, json=data)
         if response.status_code == 200:
-            return response.json()["content"][0]["text"].strip()
+            result = response.json()["content"][0]["text"].strip()
+            # 대괄호 제거
+            result = result.replace("[", "").replace("]", "")
+            # 길이 초과시 자르기
+            if len(result) > 30:
+                result = result[:27] + "..."
+            return result
         else:
             return f"{title[:20]}..."
     except Exception as e:
@@ -68,14 +81,21 @@ def get_one_line_summary(title, content):
 
 def get_category_trend(items):
     """카테고리별 핵심 트렌드 한 줄 요약"""
-    titles = [item[0] for item in items[:3]]  # 상위 3개만 분석
+    titles = [item[0] for item in items[:3]]
     
-    prompt = f"""다음 뉴스 제목들의 핵심 트렌드를 15자 이내로 요약하세요.
+    prompt = f"""다음 뉴스들의 핵심 트렌드를 15자 이내로 요약하세요.
 
 {chr(10).join(titles)}
 
-한국어로 간결하게 요약하세요.
-예시: 금리인상 우려 확산
+규칙:
+- 15자 이내
+- 번호나 리스트 금지
+- 하나의 완전한 문장
+- 대괄호 사용 금지
+
+예시:
+금리인상 우려 확산
+부동산 거래 활발
 
 요약:"""
 
@@ -96,11 +116,17 @@ def get_category_trend(items):
         response = requests.post("https://api.anthropic.com/v1/messages", 
                                headers=headers, json=data)
         if response.status_code == 200:
-            return response.json()["content"][0]["text"].strip()
+            result = response.json()["content"][0]["text"].strip()
+            # 번호나 리스트 제거
+            result = result.split("1.")[0].strip()
+            result = result.replace("[", "").replace("]", "")
+            if len(result) > 20:
+                result = result[:17] + "..."
+            return result
         else:
-            return "주요 동향 분석"
+            return "주요 동향"
     except:
-        return "주요 동향 분석"
+        return "주요 동향"
 
 def compose_kakao_message(grouped):
     """카카오톡에 최적화된 메시지 구성"""
