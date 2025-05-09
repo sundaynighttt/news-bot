@@ -35,13 +35,13 @@ def run_claude_summary(title, content):
     prompt = f"""Human: 아래 뉴스 제목과 본문 내용을 정확히 다음 형식에 맞춰 요약해줘.
 형식 예시:
 
-제목요약: 금리 동결
-내용요약: 연준 금리 동결 발표 영향
+금리 동결
+연준 금리 동결 발표 영향
 
 이제 요약할 뉴스는 다음과 같아:
 
-제목: {title}
-내용: {content}
+{title}
+{content}
 
 Assistant:"""
 
@@ -62,7 +62,7 @@ Assistant:"""
 
 def run_category_summary(titles_and_contents):
     article_list = "\n\n".join([f"제목: {t}\n내용: {c}" for t, c in titles_and_contents])
-    prompt = f"""Human: 아래는 같은 분야 뉴스 5개의 제목과 본문 내용이야. 이 5개의 뉴스를 종합해서 하나의 인사이트를 뽑아줘.
+    prompt = f"""Human: 아래는 같은 분야 뉴스 5개의 제목과 본문 내용이야. 이 5개의 뉴스를 종합해서 25자 이내로 하나의 인사이트를 뽑아줘.
 형식:
 🧠 요약: (하나의 문장으로 종합 요약)
 
