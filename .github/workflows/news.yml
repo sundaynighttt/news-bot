@@ -26,6 +26,8 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run scraper and upload to Google Sheets
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
         run: |
           python google_upload/news_scraper.py
           python google_upload/upload_to_sheets.py
