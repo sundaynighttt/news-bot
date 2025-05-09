@@ -12,7 +12,7 @@ with open("google_upload/credentials.json", "w") as f:
     f.write(base64.b64decode(b64_cred).decode('utf-8'))
 
 SERVICE_ACCOUNT_FILE = 'google_upload/credentials.json'
-SPREADSHEET_ID = '1KBDB7D5sTvCGM-thDkYCnO-2kvsSoQc4RxDGoOO4Rdk'  # 📄 너가 만든 구글 시트 ID로 바꿔야 함
+SPREADSHEET_ID = '1KBDB7D5sTvCGM-thDkYCnO-2kvsSoQc4RxDGoOO4Rdk'
 SHEET_NAME = '뉴스요약'
 
 def upload_csv_to_google_sheets(csv_file):
