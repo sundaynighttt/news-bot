@@ -40,7 +40,7 @@ def convert_md_to_csv(md_file, csv_file):
         for i, line in enumerate(lines):
             if line.startswith("## 📌"):
                 current_cat = line.strip().replace("## 📌", "").strip()
-            elif line.strip().startswith("1.") or (line.strip()[0].isdigit() and line.strip()[1] == "."):
+            elif line.strip().startswith("1.") or (len(line.strip()) > 1 and line.strip()[0].isdigit() and line.strip()[1] == "."):
                 try:
                     title_line = line.strip().split("**")[1]
                     summary = lines[i + 1].replace("- ", "").strip()
