@@ -32,12 +32,7 @@ def fetch_today_news():
     return filtered, sh
 
 def run_claude_summary(title, content):
-    prompt = f"""Human: 다음 뉴스 제목과 내용을 한 문장으로 요약해줘.
-제목: {title}
-내용: {content}
-
-Assistant:"""  # triple quotes with escaped newlines
-
+    prompt = f"Human: 다음 뉴스 제목과 내용을 한 문장으로 요약해줘.\n제목: {title}\n내용: {content}\n\nAssistant:"
     headers = {
         "x-api-key": os.environ['ANTHROPIC_API_KEY'],
         "anthropic-version": "2023-06-01",
@@ -70,8 +65,9 @@ def main():
     grouped = defaultdict(list)
     for row in rows:
         category, title, content, link = row[1], row[2], row[3], row[4]
-        gpt_summary = run_claude_summary(title, content)
-        grouped[category].append((title, gpt_summary, link))
+        if len(grouped[category]) < 5:  # ✅ 최대 5개 제한
+            gpt_summary = run_claude_summary(title, content)
+            grouped[category].append((title, gpt_summary, link))
 
     markdown_summary = compose_markdown(grouped)
     try:
