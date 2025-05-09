@@ -52,7 +52,12 @@ def compose_markdown(grouped):
     today_str_kor = datetime.now().strftime('%Y년 %m월 %d일')
     lines = [f"{today_str_kor} 경제정보 요약\n"]
     for idx, (cat, items) in enumerate(grouped.items(), 1):
+        # 카테고리 요약 요청
+        combined_content = "\n".join([f"{title}: {summary}" for title, summary, _ in items])
+        category_summary = run_claude_summary(f"{cat} 관련 기사 요약", combined_content)
+
         lines.append(f"{idx}. {cat}")
+        lines.append(f"📌 요약: {category_summary}")
         for title, summary, link in items:
             lines.append(f"- {title}, {summary}\n  (원문링크: {link})")
         lines.append("")
@@ -65,7 +70,7 @@ def main():
     grouped = defaultdict(list)
     for row in rows:
         category, title, content, link = row[1], row[2], row[3], row[4]
-        if len(grouped[category]) < 5:  # ✅ 최대 5개 제한
+        if len(grouped[category]) < 5:
             gpt_summary = run_claude_summary(title, content)
             grouped[category].append((title, gpt_summary, link))
 
