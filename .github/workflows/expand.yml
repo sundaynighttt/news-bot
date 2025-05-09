@@ -1,0 +1,29 @@
+
+name: Claude News Expansion
+
+on:
+  schedule:
+    - cron: '5 22 * * *'  # 매일 오전 7시 5분 KST
+  workflow_dispatch:
+
+jobs:
+  expand:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests gspread google-auth
+
+      - name: Run Claude expansion
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python google_upload/daily_filter_and_expand_claude.py
