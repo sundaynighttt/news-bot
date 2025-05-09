@@ -1,4 +1,3 @@
-
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
@@ -31,74 +30,101 @@ def fetch_today_news():
     filtered = [r for r in rows if r[0] == today and "본문 추출 실패" not in r[3]]
     return filtered, sh
 
-def run_claude_summary(title, content):
-    prompt = f"""Human: 아래 뉴스 제목과 본문 내용을 정확히 다음 형식에 맞춰 요약해줘.
-형식 예시:
+def get_one_line_summary(title, content):
+    """뉴스를 한 줄로 간단히 요약"""
+    prompt = f"""다음 뉴스를 카카오톡용으로 20자 이내로 요약하세요.
 
-금리 동결
-연준 금리 동결 발표 영향
+제목: {title}
+내용: {content[:500]}
 
-이제 요약할 뉴스는 다음과 같아:
+형식: [핵심키워드] + [핵심내용]
+예시: 강남아파트 매도 75% 급증
 
-{title}
-{content}
-
-Assistant:"""
+요약:"""
 
     headers = {
         "x-api-key": os.environ['ANTHROPIC_API_KEY'],
         "anthropic-version": "2023-06-01",
         "Content-Type": "application/json",
     }
+    
     data = {
         "model": "claude-3-haiku-20240307",
-        "max_tokens": 200,
-        "temperature": 0.5,
+        "max_tokens": 50,
+        "temperature": 0.3,
         "messages": [{"role": "user", "content": prompt}]
     }
+    
+    try:
+        response = requests.post("https://api.anthropic.com/v1/messages", 
+                               headers=headers, json=data)
+        if response.status_code == 200:
+            return response.json()["content"][0]["text"].strip()
+        else:
+            return f"{title[:20]}..."
+    except Exception as e:
+        print(f"API 오류: {e}")
+        return f"{title[:20]}..."
 
-    response = requests.post("https://api.anthropic.com/v1/messages", headers=headers, json=data)
-    return response.json()["content"][0]["text"].strip()
+def get_category_trend(items):
+    """카테고리별 핵심 트렌드 한 줄 요약"""
+    titles = [item[0] for item in items[:3]]  # 상위 3개만 분석
+    
+    prompt = f"""다음 뉴스 제목들의 핵심 트렌드를 15자 이내로 요약하세요.
 
-def run_category_summary(titles_and_contents):
-    article_list = "\n\n".join([f"제목: {t}\n내용: {c}" for t, c in titles_and_contents])
-    prompt = f"""Human: 아래는 같은 분야 뉴스 5개의 제목과 본문 내용이야. 이 5개의 뉴스를 종합해서 25자 이내로 하나의 인사이트를 뽑아줘.
-형식:
-🧠 요약: (하나의 문장으로 종합 요약)
+{chr(10).join(titles)}
 
-{article_list}
+한국어로 간결하게 요약하세요.
+예시: 금리인상 우려 확산
 
-Assistant:"""
+요약:"""
 
     headers = {
         "x-api-key": os.environ['ANTHROPIC_API_KEY'],
         "anthropic-version": "2023-06-01",
         "Content-Type": "application/json",
     }
+    
     data = {
         "model": "claude-3-haiku-20240307",
-        "max_tokens": 300,
-        "temperature": 0.4,
+        "max_tokens": 30,
+        "temperature": 0.3,
         "messages": [{"role": "user", "content": prompt}]
     }
+    
+    try:
+        response = requests.post("https://api.anthropic.com/v1/messages", 
+                               headers=headers, json=data)
+        if response.status_code == 200:
+            return response.json()["content"][0]["text"].strip()
+        else:
+            return "주요 동향 분석"
+    except:
+        return "주요 동향 분석"
 
-    response = requests.post("https://api.anthropic.com/v1/messages", headers=headers, json=data)
-    return response.json()["content"][0]["text"].strip()
-
-def compose_markdown(grouped):
-    today_str_kor = datetime.now().strftime('%Y년 %m월 %d일')
-    lines = [f"✅ {today_str_kor} 경제정보 요약\n"]
-
-    for idx, (cat, items) in enumerate(grouped.items(), 1):
-        # 카테고리 요약
-        category_summary = run_category_summary([(t, c) for t, c, _ in items])
-        lines.append(f"\n📌 {cat}\n{category_summary}\n")
-
-        # 기사별 요약
-        for title, content, link in items:
-            summary = run_claude_summary(title, content)
-            lines.append(f"• 🔹 {title}\n📄 AI 요약: {summary}\n🔗 링크: {link}\n")
-
+def compose_kakao_message(grouped):
+    """카카오톡에 최적화된 메시지 구성"""
+    today_str = datetime.now().strftime('%m/%d')
+    lines = [f"📅 {today_str} 경제뉴스\n"]
+    
+    for cat, items in grouped.items():
+        lines.append(f"【{cat}】")
+        
+        # 카테고리 트렌드
+        trend = get_category_trend(items)
+        lines.append(f"💡 {trend}")
+        
+        # 각 기사 한 줄 요약 (최대 5개)
+        for idx, (title, content, link) in enumerate(items[:5], 1):
+            summary = get_one_line_summary(title, content)
+            lines.append(f"{idx}. {summary}")
+        
+        lines.append("")  # 카테고리 사이 공백
+    
+    # 맨 마지막에 링크 추가
+    lines.append("📌 전체뉴스")
+    lines.append("https://news.naver.com/main/ranking/popularDay.naver?mid=etc&sid1=101")
+    
     return "\n".join(lines)
 
 def main():
@@ -110,18 +136,22 @@ def main():
         category, title, content, link = row[1], row[2], row[3], row[4]
         grouped[category].append((title, content, link))
 
-    # 5개 제한
+    # 카테고리별 5개로 제한
     for cat in grouped:
         grouped[cat] = grouped[cat][:5]
 
-    markdown_summary = compose_markdown(grouped)
+    kakao_message = compose_kakao_message(grouped)
+    
     try:
         target_ws = sh.worksheet(TARGET_SHEET)
     except:
         target_ws = sh.add_worksheet(title=TARGET_SHEET, rows="100", cols="2")
         target_ws.append_row(["날짜", "요약"])
 
-    target_ws.append_row([today, markdown_summary], value_input_option='RAW')
+    target_ws.append_row([today, kakao_message], value_input_option='RAW')
+    
+    # 콘솔에도 출력
+    print(kakao_message)
 
 if __name__ == "__main__":
     main()
