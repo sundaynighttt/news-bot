@@ -1,6 +1,6 @@
 import gspread
 from google.oauth2.service_account import Credentials
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections import defaultdict
 import os
 import base64
@@ -26,7 +26,8 @@ def fetch_today_news():
     ws = sh.worksheet(SOURCE_SHEET)
     rows = ws.get_all_values()[1:]  # header 제외
 
-    today = datetime.now().strftime('%Y-%m-%d')
+    # KST 기준 오늘 날짜
+    today = (datetime.now() + timedelta(hours=9)).strftime('%Y-%m-%d')
     filtered = [r for r in rows if r[0] == today and "본문 추출 실패" not in r[3]]
     return filtered, sh
 
@@ -152,8 +153,14 @@ def get_category_trend(items):
 
 def compose_kakao_message(grouped):
     """카카오톡에 최적화된 확장 메시지"""
-    today_str = datetime.now().strftime('%m/%d')
-    lines = [f"📅 {today_str} 경제뉴스\n"]
+    # KST 기준 현재 날짜와 요일 가져오기
+    kst_now = datetime.now() + timedelta(hours=9)
+    weekdays = ['월', '화', '수', '목', '금', '토', '일']
+    weekday = weekdays[kst_now.weekday()]
+    today_str = kst_now.strftime(f'%m/%d({weekday})')
+    
+    # 제목에 요일과 "입니다" 추가
+    lines = [f"📅 {today_str} 경제뉴스입니다\n"]
     
     for cat, items in grouped.items():
         lines.append(f"【{cat}】")
@@ -183,7 +190,8 @@ def compose_kakao_message(grouped):
     return "\n".join(lines)
 
 def main():
-    today = datetime.now().strftime('%Y-%m-%d')
+    # KST 기준 오늘 날짜
+    today = (datetime.now() + timedelta(hours=9)).strftime('%Y-%m-%d')
     rows, sh = fetch_today_news()
 
     grouped = defaultdict(list)
