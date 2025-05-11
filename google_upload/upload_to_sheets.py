@@ -3,7 +3,7 @@ import gspread
 import base64
 import os
 from google.oauth2.service_account import Credentials
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # 복호화 후 credentials.json 파일 생성
 b64_cred = os.environ['GOOGLE_CREDENTIALS']
@@ -50,7 +50,7 @@ def convert_md_to_csv(md_file, csv_file):
                     continue
 
 if __name__ == "__main__":
-    today = datetime.now().strftime('%Y-%m-%d')
+    today = (datetime.now() + timedelta(hours=9)).strftime('%Y-%m-%d')
     md_file = f"output_{today}.md"
     csv_file = f"output_{today}.csv"
     convert_md_to_csv(md_file, csv_file)
