@@ -1,6 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
-from datetime import datetime
+from datetime import datetime, timedelta
 
 keywords = {
     '부동산': ['서울', '아파트', '부동산', '전세', '재건축', '입주', '실거래', '청약', '분양', '매매', '거래량', '중개업소'],
@@ -43,7 +43,7 @@ for article in articles:
                 results[category].append((title, link, paragraph))
             break
 
-today = datetime.now().strftime('%Y-%m-%d')
+today = (datetime.now() + timedelta(hours=9)).strftime('%Y-%m-%d')
 with open(f"output_{today}.md", "w", encoding="utf-8") as f:
     f.write(f"# 📅 {today} 네이버 경제 키워드 뉴스 요약\n\n")
     for cat, items in results.items():
