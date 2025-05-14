@@ -63,6 +63,10 @@ def main():
 
     insight = get_real_estate_insight(text_block)
     
+    # 시트 크기 조정 (필요한 경우)
+    if ws.col_count < 3:
+        ws.resize(rows=ws.row_count, cols=3)
+    
     # 시트 오른쪽 셀에 인사이트 저장
     cell = ws.find(today)
     if cell:

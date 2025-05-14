@@ -65,13 +65,10 @@ def main():
     grouped = defaultdict(list)
     for row in rows:
         cat, title, summary, link = row[1], row[2], row[3], row[4]
-        grouped[cat].append(f"{title}
-{summary}
-{link}")
+        grouped[cat].append(f"{title}\n{summary}\n{link}")
 
     today = datetime.now().strftime('%Y-%m-%d')
-    weekly_output = [f"📅 {today} 주간 경제 뉴스 요약
-"]
+    weekly_output = [f"📅 {today} 주간 경제 뉴스 요약\n"]
     for cat, texts in grouped.items():
         joined = "\n\n".join(texts[:5])
         insight = get_weekly_summary(joined)
