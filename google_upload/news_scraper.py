@@ -32,7 +32,7 @@ def extract_first_paragraph(url):
 
 logger.info("뉴스 수집 시작")
 
-@error_handler('news_scraper')
+@error_handler('news_scraper', notify_success=True)  # 성공 알림 받기
 def main():
     url = "https://news.naver.com/main/ranking/popularDay.naver?mid=etc&sid1=101"
     res = requests.get(url)

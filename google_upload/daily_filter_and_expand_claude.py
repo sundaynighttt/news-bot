@@ -5,6 +5,12 @@ from collections import defaultdict
 import os
 import base64
 import requests
+from logging_config import setup_logger, log_execution_time
+from error_handler import error_handler
+
+# 로거 설정
+logger = setup_logger('daily_filter_and_expand_claude')
+start_time = datetime.now()
 
 # 복호화된 credentials 생성
 b64_cred = os.environ['GOOGLE_CREDENTIALS']
@@ -189,9 +195,11 @@ def compose_kakao_message(grouped):
     
     return "\n".join(lines)
 
+@error_handler('daily_filter_and_expand_claude')
 def main():
     # KST 기준 오늘 날짜
     today = (datetime.now() + timedelta(hours=9)).strftime('%Y-%m-%d')
+    logger.info("오늘자 뉴스 데이터 가져오기")
     rows, sh = fetch_today_news()
 
     grouped = defaultdict(list)
@@ -203,8 +211,10 @@ def main():
     for cat in grouped:
         grouped[cat] = grouped[cat][:5]
 
+    logger.info("카카오톡 메시지 생성")
     kakao_message = compose_kakao_message(grouped)
     
+    logger.info("Google Sheets에 저장")
     try:
         target_ws = sh.worksheet(TARGET_SHEET)
     except:
@@ -212,6 +222,9 @@ def main():
         target_ws.append_row(["날짜", "요약", "부동산인사이트"])
 
     target_ws.append_row([today, kakao_message, ""], value_input_option='RAW')
+    
+    logger.info("데이터 저장 완료")
+    log_execution_time(logger, start_time, 'daily_filter_and_expand_claude')
     
     # 콘솔에도 출력
     print(kakao_message)

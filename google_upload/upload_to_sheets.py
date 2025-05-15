@@ -4,6 +4,12 @@ import base64
 import os
 from google.oauth2.service_account import Credentials
 from datetime import datetime, timedelta
+from logging_config import setup_logger, log_execution_time
+from error_handler import error_handler
+
+# 로거 설정
+logger = setup_logger('upload_to_sheets')
+start_time = datetime.now()
 
 # 복호화 후 credentials.json 파일 생성
 b64_cred = os.environ['GOOGLE_CREDENTIALS']
@@ -49,7 +55,8 @@ def convert_md_to_csv(md_file, csv_file):
                 except:
                     continue
 
-if __name__ == "__main__":
+@error_handler('upload_to_sheets')
+def main():
     today = (datetime.now() + timedelta(hours=9)).strftime('%Y-%m-%d')
     year_month = (datetime.now() + timedelta(hours=9)).strftime('%Y/%m')
     
@@ -61,5 +68,15 @@ if __name__ == "__main__":
     os.makedirs(csv_dir, exist_ok=True)
     csv_file = f"{csv_dir}/output_{today}.csv"
     
+    logger.info("CSV 변환 시작")
     convert_md_to_csv(md_file, csv_file)
+    logger.info(f"CSV 파일 생성: {csv_file}")
+    
+    logger.info("Google Sheets 업로드 시작")
     upload_csv_to_google_sheets(csv_file)
+    logger.info("Google Sheets 업로드 완료")
+    
+    log_execution_time(logger, start_time, 'upload_to_sheets')
+
+if __name__ == "__main__":
+    main()
