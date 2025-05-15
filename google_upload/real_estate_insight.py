@@ -1,6 +1,6 @@
 import gspread
 from google.oauth2.service_account import Credentials
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import base64
 import requests
@@ -23,7 +23,7 @@ def get_today_summary():
     ws = sh.worksheet(SHEET_NAME)
     
     records = ws.get_all_values()
-    today = datetime.now().strftime('%Y-%m-%d')
+    today = (datetime.now() + timedelta(hours=9)).strftime('%Y-%m-%d')
     
     for row in records[::-1]:  # 최근 행부터 역순으로 탐색
         if row[0] == today:
@@ -54,7 +54,7 @@ def get_real_estate_insight(text_block):
     return response.json()["content"][0]["text"].strip()
 
 def main():
-    today = datetime.now().strftime('%Y-%m-%d')
+    today = (datetime.now() + timedelta(hours=9)).strftime('%Y-%m-%d')
     text_block, ws = get_today_summary()
     
     if not text_block:

@@ -51,7 +51,15 @@ def convert_md_to_csv(md_file, csv_file):
 
 if __name__ == "__main__":
     today = (datetime.now() + timedelta(hours=9)).strftime('%Y-%m-%d')
-    md_file = f"output_{today}.md"
-    csv_file = f"output_{today}.csv"
+    year_month = (datetime.now() + timedelta(hours=9)).strftime('%Y/%m')
+    
+    # 입력 파일 경로 (raw 폴더에서)
+    md_file = f"data/raw/{year_month}/output_{today}.md"
+    
+    # 출력 파일 경로 (processed 폴더로)
+    csv_dir = f"data/processed/{year_month}"
+    os.makedirs(csv_dir, exist_ok=True)
+    csv_file = f"{csv_dir}/output_{today}.csv"
+    
     convert_md_to_csv(md_file, csv_file)
     upload_csv_to_google_sheets(csv_file)

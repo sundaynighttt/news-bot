@@ -1,4 +1,3 @@
-
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime, timedelta
@@ -26,7 +25,7 @@ def fetch_week_news():
     ws = sh.worksheet(SOURCE_SHEET)
     rows = ws.get_all_values()[1:]
 
-    today = datetime.now()
+    today = datetime.now() + timedelta(hours=9)
     week_dates = [(today - timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
     filtered = [r for r in rows if r[0] in week_dates and "본문 추출 실패" not in r[3]]
     return filtered, sh
@@ -67,7 +66,7 @@ def main():
         cat, title, summary, link = row[1], row[2], row[3], row[4]
         grouped[cat].append(f"{title}\n{summary}\n{link}")
 
-    today = datetime.now().strftime('%Y-%m-%d')
+    today = (datetime.now() + timedelta(hours=9)).strftime('%Y-%m-%d')
     weekly_output = [f"📅 {today} 주간 경제 뉴스 요약\n"]
     for cat, texts in grouped.items():
         joined = "\n\n".join(texts[:5])

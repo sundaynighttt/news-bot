@@ -211,7 +211,7 @@ def main():
         target_ws = sh.add_worksheet(title=TARGET_SHEET, rows="100", cols="3")
         target_ws.append_row(["날짜", "요약", "부동산인사이트"])
 
-    target_ws.append_row([today, kakao_message], value_input_option='RAW')
+    target_ws.append_row([today, kakao_message, ""], value_input_option='RAW')
     
     # 콘솔에도 출력
     print(kakao_message)

@@ -1,6 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
+import os
 
 keywords = {
     '부동산': ['서울', '아파트', '부동산', '전세', '재건축', '입주', '실거래', '청약', '분양', '매매', '거래량', '중개업소'],
@@ -43,8 +44,15 @@ for article in articles:
                 results[category].append((title, link, paragraph))
             break
 
+# 날짜별 폴더 생성
 today = (datetime.now() + timedelta(hours=9)).strftime('%Y-%m-%d')
-with open(f"output_{today}.md", "w", encoding="utf-8") as f:
+year_month = (datetime.now() + timedelta(hours=9)).strftime('%Y/%m')
+output_dir = f"data/raw/{year_month}"
+os.makedirs(output_dir, exist_ok=True)
+
+# 파일 저장
+output_file = f"{output_dir}/output_{today}.md"
+with open(output_file, "w", encoding="utf-8") as f:
     f.write(f"# 📅 {today} 네이버 경제 키워드 뉴스 요약\n\n")
     for cat, items in results.items():
         if len(items) >= 3:
