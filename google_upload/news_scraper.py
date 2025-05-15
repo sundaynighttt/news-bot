@@ -9,6 +9,9 @@ from error_handler import error_handler
 logger = setup_logger('news_scraper')
 start_time = datetime.now()
 
+# 수집 설정
+MAX_COLLECTION_PER_CATEGORY = 30  # 각 카테고리별 최대 수집 개수
+
 keywords = {
     '부동산': ['서울', '아파트', '부동산', '전세', '재건축', '입주', '실거래', '청약', '분양', '매매', '거래량', '중개업소'],
     '금리': ['금리', '연준', '인상', '인하', '기준금리', '물가', 'CPI', '물가상승률', '금통위', '채권', '유동성'],
@@ -52,7 +55,7 @@ def main():
     
         for category, words in keywords.items():
             if any(word in title for word in words):
-                if len(results[category]) < 10:
+                if len(results[category]) < MAX_COLLECTION_PER_CATEGORY:
                     paragraph = extract_first_paragraph(link)
                     results[category].append((title, link, paragraph))
                 break
@@ -71,7 +74,8 @@ def main():
             if len(items) >= 3:
                 logger.info(f"{cat} 카테고리: {len(items)}개 기사 수집")
                 f.write(f"## 📌 {cat}\n\n")
-                for i, (title, link, para) in enumerate(items[:10], 1):
+                # 파일에는 모든 수집된 기사 저장 (30개까지)
+                for i, (title, link, para) in enumerate(items, 1):
                     f.write(f"{i}. **{title}**\n   - {para}\n   - [기사 링크]({link})\n\n")
     
     logger.info(f"데이터 저장 완료: {output_file}")

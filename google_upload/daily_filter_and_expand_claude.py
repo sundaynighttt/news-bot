@@ -12,6 +12,55 @@ from error_handler import error_handler
 logger = setup_logger('daily_summary_and_insight')
 start_time = datetime.now()
 
+# 투자 관련 핵심 키워드와 가중치
+INVESTMENT_KEYWORDS = {
+    # 직접적 투자 키워드 (높은 가중치)
+    '수익률': 10,
+    '투자': 9,
+    '매매': 8,
+    '시세': 8,
+    '가격': 7,
+    '상승': 6,
+    '하락': 6,
+    '수익': 7,
+    '손실': 6,
+    
+    # 간접적 투자 키워드 (중간 가중치)
+    '전망': 5,
+    '분석': 5,
+    '예상': 4,
+    '변동': 4,
+    '공급': 4,
+    '수요': 4,
+    
+    # 자산 유형 키워드 (기본 가중치)
+    '부동산': 3,
+    '주식': 3,
+    '채권': 3,
+    '금': 3,
+    '달러': 3,
+    '환율': 3
+}
+
+# 카테고리별 특화 키워드
+CATEGORY_KEYWORDS = {
+    '부동산': {
+        '강남': 5, '재건축': 5, '분양가': 4, 
+        '입주물량': 4, '거래량': 4, '규제완화': 5,
+        '청약': 4, '대출': 3, '금리': 4
+    },
+    '금리': {
+        '기준금리': 5, '인하': 4, '인상': 4,
+        '연준': 5, '한은': 5, '통화정책': 4,
+        '물가': 4, 'CPI': 4, '경기': 4
+    },
+    '해외주식': {
+        '나스닥': 4, 'S&P': 4, '실적': 5,
+        '배당': 5, 'ETF': 4, '환율': 4,
+        '테슬라': 3, '애플': 3, '엔비디아': 3
+    }
+}
+
 # 복호화된 credentials 생성
 b64_cred = os.environ['GOOGLE_CREDENTIALS']
 os.makedirs("google_upload", exist_ok=True)
@@ -23,6 +72,66 @@ SERVICE_ACCOUNT_FILE = 'google_upload/credentials.json'
 SPREADSHEET_ID = '1KBDB7D5sTvCGM-thDkYCnO-2kvsSoQc4RxDGoOO4Rdk'
 SOURCE_SHEET = '뉴스요약'
 TARGET_SHEET = '요약결과'
+
+def calculate_investment_score(title, content):
+    """투자 관련성 점수 계산"""
+    score = 0
+    
+    # 제목 가중치 (2배)
+    for keyword, weight in INVESTMENT_KEYWORDS.items():
+        if keyword in title:
+            score += weight * 2
+    
+    # 본문 가중치 (1배)
+    if content:
+        for keyword, weight in INVESTMENT_KEYWORDS.items():
+            if keyword in content[:200]:  # 철 200자만 확인
+                score += weight
+    
+    return score
+
+def calculate_category_score(title, content, category):
+    """카테고리별 특화 키워드 점수"""
+    score = 0
+    
+    if category in CATEGORY_KEYWORDS:
+        for keyword, weight in CATEGORY_KEYWORDS[category].items():
+            if keyword in title:
+                score += weight * 2
+            if keyword in content[:200]:
+                score += weight
+    
+    return score
+
+def select_top_investment_news(articles, category, top_n=5):
+    """투자 관련성 기준으로 상위 뉴스 선별"""
+    scored_articles = []
+    
+    for idx, (title, content, link) in enumerate(articles):
+        # 기본 점수: 순서 (최신일수록 높음)
+        order_score = len(articles) - idx
+        
+        # 투자 관련성 점수
+        investment_score = calculate_investment_score(title, content)
+        
+        # 카테고리별 특화 점수
+        category_score = calculate_category_score(title, content, category)
+        
+        # 종합 점수 (가중치 적용)
+        total_score = (
+            investment_score * 0.5 +  # 50%: 투자 관련성
+            category_score * 0.3 +    # 30%: 카테고리 특화
+            order_score * 0.2         # 20%: 최신성
+        )
+        
+        scored_articles.append((title, content, link, total_score))
+        
+        # 로깅 추가
+        logger.debug(f"{category} - {title}: 투자점수={investment_score}, 카테고리점수={category_score}, 총점={total_score:.2f}")
+    
+    # 점수 기준 정렬 후 상위 5개 선택
+    sorted_articles = sorted(scored_articles, key=lambda x: x[3], reverse=True)
+    return [(title, content, link) for title, content, link, _ in sorted_articles[:top_n]]
 
 def fetch_today_news():
     scopes = ['https://www.googleapis.com/auth/spreadsheets']
@@ -188,7 +297,7 @@ def get_real_estate_insight(text_block):
         logger.error(f"부동산 인사이트 생성 중 오류: {str(e)}")
         return "부동산 인사이트 생성 오류"
 
-def compose_kakao_message(grouped):
+def compose_kakao_message(selected_grouped):
     """카카오톡에 최적화된 확장 메시지"""
     # KST 기준 현재 날짜와 요일 가져오기
     kst_now = datetime.now() + timedelta(hours=9)
@@ -199,26 +308,28 @@ def compose_kakao_message(grouped):
     # 제목에 요일과 "입니다" 추가
     lines = [f"📅 {today_str} 경제뉴스입니다\n"]
     
-    for cat, items in grouped.items():
-        lines.append(f"【{cat}】")
-        
-        # 카테고리 트렌드
-        trend = get_category_trend(items)
-        lines.append(f"💡 {trend}\n")
-        
-        # 각 기사 제목과 내용 요약
-        for idx, (title, content, link) in enumerate(items[:5], 1):
-            title_summary = get_title_summary(title)
-            content_summary = get_content_summary(content)
+    for cat, items in selected_grouped.items():
+        if items:  # 선별된 기사가 있는 경우만
+            lines.append(f"【{cat}】")
             
-            lines.append(f"{idx}. {title_summary}")
-            lines.append(f"   → {content_summary}")
+            # 카테고리 트렌드
+            trend = get_category_trend(items)
+            lines.append(f"💡 {trend}")
+            lines.append(f"(투자 관련성 높은 TOP5)\n")
             
-            # 기사 사이 간격
-            if idx < len(items[:5]):
-                lines.append("")
-        
-        lines.append("")  # 카테고리 사이 공백
+            # 각 기사 제목과 내용 요약
+            for idx, (title, content, link) in enumerate(items, 1):
+                title_summary = get_title_summary(title)
+                content_summary = get_content_summary(content)
+                
+                lines.append(f"{idx}. {title_summary}")
+                lines.append(f"   → {content_summary}")
+                
+                # 기사 사이 간격
+                if idx < len(items):
+                    lines.append("")
+            
+            lines.append("")  # 카테고리 사이 공백
     
     # 맨 마지막에 링크 추가
     lines.append("📌 전체뉴스")
@@ -238,12 +349,16 @@ def main():
         category, title, content, link = row[1], row[2], row[3], row[4]
         grouped[category].append((title, content, link))
 
-    # 카테고리별 5개로 제한
-    for cat in grouped:
-        grouped[cat] = grouped[cat][:5]
+    # 투자 관련성 기준으로 상위 5개 선별
+    selected_grouped = {}
+    for cat, articles in grouped.items():
+        logger.info(f"{cat} 카테고리: {len(articles)}개 뉴스 중 상위 5개 선별")
+        selected_articles = select_top_investment_news(articles, cat)
+        selected_grouped[cat] = selected_articles
+        logger.info(f"{cat} 카테고리: {len(selected_articles)}개 선별 완료")
 
     logger.info("카카오톡 메시지 생성")
-    kakao_message = compose_kakao_message(grouped)
+    kakao_message = compose_kakao_message(selected_grouped)
     
     logger.info("부동산 인사이트 생성")
     insight = get_real_estate_insight(kakao_message)
