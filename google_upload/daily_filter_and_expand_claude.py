@@ -42,6 +42,16 @@ INVESTMENT_KEYWORDS = {
     '환율': 3
 }
 
+# 블랙리스트 키워드 - 이 키워드가 포함된 뉴스는 제외
+BLACKLIST_KEYWORDS = [
+    '성매매', '성병', '성범죄', '마약', '살인', '폭행',
+    '절도', '사기', '도박', '성폭행', '성추행', '아동',
+    '음란', '불법', '구속', '체포', '혐의', '기소'
+]
+
+# 최소 투자 관련성 점수
+MINIMUM_INVESTMENT_SCORE = 10
+
 # 카테고리별 특화 키워드
 CATEGORY_KEYWORDS = {
     '부동산': {
@@ -85,10 +95,20 @@ def calculate_investment_score(title, content):
     # 본문 가중치 (1배)
     if content:
         for keyword, weight in INVESTMENT_KEYWORDS.items():
-            if keyword in content[:200]:  # 철 200자만 확인
+            if keyword in content[:200]:  # 첫 200자만 확인
                 score += weight
     
     return score
+
+def has_blacklist_keywords(title, content):
+    """블랙리스트 키워드 포함 여부 확인"""
+    text = title + (content[:500] if content else '')
+    
+    for keyword in BLACKLIST_KEYWORDS:
+        if keyword in text:
+            return True
+    
+    return False
 
 def calculate_category_score(title, content, category):
     """카테고리별 특화 키워드 점수"""
@@ -106,13 +126,28 @@ def calculate_category_score(title, content, category):
 def select_top_investment_news(articles, category, top_n=5):
     """투자 관련성 기준으로 상위 뉴스 선별"""
     scored_articles = []
+    filtered_articles = []
     
-    for idx, (title, content, link) in enumerate(articles):
+    # 1단계: 블랙리스트 필터링
+    for article in articles:
+        title, content, link = article
+        if not has_blacklist_keywords(title, content):
+            filtered_articles.append(article)
+        else:
+            logger.debug(f"블랙리스트 필터링: {title}")
+    
+    # 2단계: 투자 관련성 점수 계산
+    for idx, (title, content, link) in enumerate(filtered_articles):
         # 기본 점수: 순서 (최신일수록 높음)
-        order_score = len(articles) - idx
+        order_score = len(filtered_articles) - idx
         
         # 투자 관련성 점수
         investment_score = calculate_investment_score(title, content)
+        
+        # 투자 관련성이 최소 기준 미달인 경우 제외
+        if investment_score < MINIMUM_INVESTMENT_SCORE:
+            logger.debug(f"투자 관련성 부족: {title} (점수: {investment_score})")
+            continue
         
         # 카테고리별 특화 점수
         category_score = calculate_category_score(title, content, category)
@@ -124,14 +159,20 @@ def select_top_investment_news(articles, category, top_n=5):
             order_score * 0.2         # 20%: 최신성
         )
         
-        scored_articles.append((title, content, link, total_score))
+        scored_articles.append((title, content, link, total_score, investment_score))
         
         # 로깅 추가
         logger.debug(f"{category} - {title}: 투자점수={investment_score}, 카테고리점수={category_score}, 총점={total_score:.2f}")
     
-    # 점수 기준 정렬 후 상위 5개 선택
+    # 점수 기준 정렬
     sorted_articles = sorted(scored_articles, key=lambda x: x[3], reverse=True)
-    return [(title, content, link) for title, content, link, _ in sorted_articles[:top_n]]
+    
+    # 최소 1개, 최대 top_n개 선택 (투자 관련성이 있는 것만)
+    selected = [(title, content, link) for title, content, link, _, _ in sorted_articles[:top_n]]
+    
+    logger.info(f"{category}: {len(articles)}개 중 {len(selected)}개 선택")
+    
+    return selected
 
 def fetch_today_news():
     scopes = ['https://www.googleapis.com/auth/spreadsheets']
@@ -305,6 +346,10 @@ def compose_kakao_message(selected_grouped):
     weekday = weekdays[kst_now.weekday()]
     today_str = kst_now.strftime(f'%m/%d({weekday})')
     
+    # 선별된 뉴스가 전혀 없는 경우
+    if not any(items for items in selected_grouped.values()):
+        return f"📅 {today_str} 경제뉴스입니다\n\n오늘은 투자 관련 뉴스가 없습니다.\n\n📌 전체뉴스\nhttps://news.naver.com/main/ranking/popularDay.naver?mid=etc&sid1=101"
+    
     # 제목에 요일과 "입니다" 추가
     lines = [f"📅 {today_str} 경제뉴스입니다\n"]
     
@@ -315,7 +360,7 @@ def compose_kakao_message(selected_grouped):
             # 카테고리 트렌드
             trend = get_category_trend(items)
             lines.append(f"💡 {trend}")
-            lines.append(f"(투자 관련성 높은 TOP5)\n")
+            lines.append(f"(투자 관련 뉴스 {len(items)}개)\n")
             
             # 각 기사 제목과 내용 요약
             for idx, (title, content, link) in enumerate(items, 1):
