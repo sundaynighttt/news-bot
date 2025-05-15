@@ -1,4 +1,4 @@
-name: Claude News Expansion
+name: 2. Daily Summary (KakaoTalk)
 
 on:
   schedule:

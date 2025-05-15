@@ -1,4 +1,4 @@
-name: Weekly Naver News Summary
+name: Weekly Summary (Saturday Only)
 
 on:
   schedule:
