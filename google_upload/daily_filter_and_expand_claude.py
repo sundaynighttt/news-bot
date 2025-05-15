@@ -9,7 +9,7 @@ from logging_config import setup_logger, log_execution_time
 from error_handler import error_handler
 
 # 로거 설정
-logger = setup_logger('daily_filter_and_expand_claude')
+logger = setup_logger('daily_summary_and_insight')
 start_time = datetime.now()
 
 # 복호화된 credentials 생성
@@ -157,6 +157,37 @@ def get_category_trend(items):
     except:
         return "주요 동향"
 
+def get_real_estate_insight(text_block):
+    """부동산 인사이트 생성"""
+    prompt = f"""너는 한국의 서울 아파트 투자 분석가야. 아래 뉴스 요약을 읽고, 서울아파트 투자 관점에서 의미 있는 시사점이나 트렌드를 5문단 이내로 정리해줘.
+
+{text_block}
+
+형식: 부동산 투자 관점에서 요약된 분석 문단 (5문단 이내)
+"""
+    headers = {
+        "x-api-key": os.environ['ANTHROPIC_API_KEY'],
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+    }
+    data = {
+        "model": "claude-3-sonnet-20240229",
+        "max_tokens": 300,
+        "temperature": 0.5,
+        "messages": [{"role": "user", "content": prompt}]
+    }
+
+    try:
+        response = requests.post("https://api.anthropic.com/v1/messages", headers=headers, json=data)
+        if response.status_code == 200:
+            return response.json()["content"][0]["text"].strip()
+        else:
+            logger.error(f"부동산 인사이트 API 오류: {response.status_code}")
+            return "부동산 인사이트 생성 실패"
+    except Exception as e:
+        logger.error(f"부동산 인사이트 생성 중 오류: {str(e)}")
+        return "부동산 인사이트 생성 오류"
+
 def compose_kakao_message(grouped):
     """카카오톡에 최적화된 확장 메시지"""
     # KST 기준 현재 날짜와 요일 가져오기
@@ -195,7 +226,7 @@ def compose_kakao_message(grouped):
     
     return "\n".join(lines)
 
-@error_handler('daily_filter_and_expand_claude')
+@error_handler('daily_summary_and_insight')
 def main():
     # KST 기준 오늘 날짜
     today = (datetime.now() + timedelta(hours=9)).strftime('%Y-%m-%d')
@@ -214,6 +245,9 @@ def main():
     logger.info("카카오톡 메시지 생성")
     kakao_message = compose_kakao_message(grouped)
     
+    logger.info("부동산 인사이트 생성")
+    insight = get_real_estate_insight(kakao_message)
+    
     logger.info("Google Sheets에 저장")
     try:
         target_ws = sh.worksheet(TARGET_SHEET)
@@ -221,10 +255,10 @@ def main():
         target_ws = sh.add_worksheet(title=TARGET_SHEET, rows="100", cols="3")
         target_ws.append_row(["날짜", "요약", "부동산인사이트"])
 
-    target_ws.append_row([today, kakao_message, ""], value_input_option='RAW')
+    target_ws.append_row([today, kakao_message, insight], value_input_option='RAW')
     
     logger.info("데이터 저장 완료")
-    log_execution_time(logger, start_time, 'daily_filter_and_expand_claude')
+    log_execution_time(logger, start_time, 'daily_summary_and_insight')
     
     # 콘솔에도 출력
     print(kakao_message)
