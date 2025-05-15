@@ -4,6 +4,12 @@ from datetime import datetime, timedelta
 import os
 import base64
 import requests
+from logging_config import setup_logger, log_execution_time
+from error_handler import error_handler
+
+# 로거 설정
+logger = setup_logger('real_estate_insight')
+start_time = datetime.now()
 
 # credentials 설정
 b64_cred = os.environ['GOOGLE_CREDENTIALS']
@@ -53,14 +59,19 @@ def get_real_estate_insight(text_block):
     response = requests.post("https://api.anthropic.com/v1/messages", headers=headers, json=data)
     return response.json()["content"][0]["text"].strip()
 
+@error_handler('real_estate_insight')
 def main():
     today = (datetime.now() + timedelta(hours=9)).strftime('%Y-%m-%d')
+    logger.info("부동산 인사이트 생성 시작")
+    
     text_block, ws = get_today_summary()
     
     if not text_block:
+        logger.warning(f"{today}에 해당하는 뉴스 요약이 없습니다.")
         print(f"{today}에 해당하는 뉴스 요약이 없습니다.")
         return
 
+    logger.info("Claude API로 인사이트 생성")
     insight = get_real_estate_insight(text_block)
     
     # 시트 크기 조정 (필요한 경우)
@@ -71,9 +82,13 @@ def main():
     cell = ws.find(today)
     if cell:
         ws.update_cell(cell.row, 3, insight)
+        logger.info("부동산 인사이트 저장 완료")
         print("부동산 인사이트 저장 완료")
     else:
+        logger.error("행을 찾을 수 없음")
         print("행을 찾을 수 없음")
+    
+    log_execution_time(logger, start_time, 'real_estate_insight')
 
 if __name__ == "__main__":
     main()
