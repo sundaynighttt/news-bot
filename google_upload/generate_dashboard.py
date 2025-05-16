@@ -1,11 +1,12 @@
+# google_upload/generate_dashboard.py 파일
 import os
 import gspread
 from google.oauth2.service_account import Credentials
-from datetime import datetime, timedelta
+from datetime import datetime
 
-# 구글 시트 설정 - 기존 credentials 활용
+# 시트 설정
 SERVICE_ACCOUNT_FILE = 'google_upload/credentials.json'
-SPREADSHEET_ID = '1KBDB7D5sTvCGM-thDkYCnO-2kvsSoQc4RxDGoOO4Rdk'
+SPREADSHEET_ID = '1KBDB7D5sTvCGM-thDkYCnO-2kvsSoQc4RxDGoOO4Rdk'  # 실제 ID로 교체
 SOURCE_SHEET = '요약결과'
 
 def main():
@@ -21,10 +22,10 @@ def main():
     # 헤더 제외한 모든 데이터
     all_rows = ws.get_all_values()[1:]
     
-    # 대시보드 디렉토리 생성
-    os.makedirs("dashboard", exist_ok=True)
+    # docs 폴더 생성
+    os.makedirs("docs", exist_ok=True)
     
-    # 간단한 인덱스 페이지 생성
+    # 인덱스 페이지 생성
     create_index_page(all_rows)
     
     # 각 날짜별 페이지 생성
@@ -84,7 +85,7 @@ def create_index_page(rows):
 </html>"""
     
     # 인덱스 파일 저장
-    with open("dashboard/index.html", "w", encoding="utf-8") as f:
+    with open("docs/index.html", "w", encoding="utf-8") as f:
         f.write(html)
 
 def create_date_page(date, summary, insight):
@@ -164,7 +165,7 @@ def create_date_page(date, summary, insight):
 </html>"""
     
     # 파일 저장
-    with open(f"dashboard/{safe_date}.html", "w", encoding="utf-8") as f:
+    with open(f"docs/{safe_date}.html", "w", encoding="utf-8") as f:
         f.write(html)
 
 def extract_categories(summary_text):
