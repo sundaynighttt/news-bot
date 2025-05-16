@@ -22,15 +22,16 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: python google_upload/daily_filter_and_expand_claude.py
         
-      # 추가: HTML 대시보드 생성
-      - name: Generate Dashboard
-        run: python google_upload/generate_dashboard.py
-        
-      # 추가: 결과물 커밋
-      - name: Commit dashboard updates
-        run: |
-          git config --global user.name 'GitHub Actions'
-          git config --global user.email 'actions@github.com'
-          git add dashboard/
-          git commit -m "Update dashboard: $(date +'%Y-%m-%d')" || echo "No changes to commit"
-          git push
+# 추가 단계
+- name: Generate Dashboard
+  run: |
+    pip install jinja2  # 템플릿 엔진 설치
+    python google_upload/generate_dashboard.py
+
+- name: Commit dashboard updates
+  run: |
+    git config --global user.name 'GitHub Actions'
+    git config --global user.email 'actions@github.com'
+    git add docs/
+    git commit -m "Update dashboard: $(date +'%Y-%m-%d')" || echo "No changes to commit"
+    git push
