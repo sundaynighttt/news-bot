@@ -1,42 +1,36 @@
 name: 2. Daily Summary (KakaoTalk)
-
 on:
   schedule:
     - cron: '5 22 * * *'  # 매일 오전 7시 5분 KST
   workflow_dispatch:
-
 jobs:
   expand:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-
       - name: Install dependencies
         run: pip install requests gspread google-auth
-
       - name: Run Claude expansion
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: python google_upload/daily_filter_and_expand_claude.py
-
-      # 새로 추가된 단계: HTML 대시보드 생성
-      - name: Generate HTML Dashboard
+        
+      # 추가: HTML 대시보드 생성
+      - name: Generate Dashboard
         run: python google_upload/generate_dashboard.py
         
-      # 새로 추가된 단계: 결과 커밋
-      - name: Commit and push dashboard
+      # 추가: 결과물 커밋
+      - name: Commit dashboard updates
         run: |
           git config --global user.name 'GitHub Actions'
           git config --global user.email 'actions@github.com'
           git add dashboard/
-          git commit -m "Update dashboard for $(date +'%Y-%m-%d')" || echo "No changes to commit"
+          git commit -m "Update dashboard: $(date +'%Y-%m-%d')" || echo "No changes to commit"
           git push
